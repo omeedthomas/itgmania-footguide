@@ -1,0 +1,16 @@
+{
+  "name": "itgmania-footguide",
+  "version": "1.0.0",
+  "private": true,
+  "license": "MIT",
+  "repository": "github:omeedthomas/itgmania-footguide",
+  "description": "Development tooling for FootGuide (an ITGmania / Simply Love mod). The mod itself is the Lua in mod/; Node is only used to run its tests.",
+  "scripts": {
+    "test": "node tests/run.js tests/patterns.lua",
+    "test:smoke": "node tests/run.js tests/module_smoke.lua",
+    "test:compare": "node tests/run.js tests/compare.lua"
+  },
+  "devDependencies": {
+    "fengari": "^0.1.4"
+  }
+}
