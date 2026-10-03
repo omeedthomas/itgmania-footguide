@@ -39,7 +39,7 @@ The badges follow your speed mod, Mini, Reverse, notefield offset and Hidden/Sud
    - **Brackets:** the foot sits heel-and-toe across two panels.
 
    Plain-language tips explain what's going on, for example *"Footswitch: lift your RIGHT foot off DOWN as your LEFT foot lands on it."* Press the wrong panel and it buzzes and counts a mistake.
-4. **Repeat until clean.** The trainer counts your clean runs in a row. **Back** returns to the section list, and from there to song select.
+4. **Repeat until clean.** The trainer counts your clean runs in a row. **Back** returns to the section list, and from there to Player Options for the same song, where you can start the trainer again or switch Foot Guide to another mode and play the song.
 
 A good learning routine:
 1. Learn a section **step by step**.

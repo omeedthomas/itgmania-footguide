@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1
+
+- **Trainer:** Back on the section list now returns to **Player Options** for the same song instead of song select. From there, Start goes back into the trainer, or you can change Foot Guide to another mode and play the song.
+- **Updating from 1.0.0:** re-run `install.ps1`. If you installed by hand, change the two `PrevScreen` / `NextScreen` lines in the `[ScreenFootGuideTrainer]` section of `metrics.ini` to `"ScreenPlayerOptions"` (see INSTALL.md).
+
 ## 1.0.0
 
 First public release.

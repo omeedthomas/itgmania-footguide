@@ -104,8 +104,8 @@ LineFootGuide="lua,FootGuideSettings.OptionRow()"
 # --- FootGuide trainer (added by FootGuide install.ps1) ---
 [ScreenFootGuideTrainer]
 Fallback="ScreenWithMenuElements"
-PrevScreen=SelectMusicOrCourse()
-NextScreen=SelectMusicOrCourse()
+PrevScreen="ScreenPlayerOptions"
+NextScreen="ScreenPlayerOptions"
 HeaderOnCommand=visible,false
 FooterOnCommand=visible,false
 ShowCreditDisplay=false

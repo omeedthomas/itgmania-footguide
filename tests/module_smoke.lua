@@ -375,7 +375,7 @@ end
 print("Trainer sections:\n    " .. table.concat(menuItems, "\n    "))
 check(#menuItems >= 1 and menuItems[1]:find("Whole chart"), "whole chart item")
 
-check(Press("Back") == true and topScreen.leftTo == "ScreenSelectMusic", "Back in the menu should go to song select")
+check(Press("Back") == true and topScreen.leftTo == "ScreenPlayerOptions", "Back in the menu should go to Player Options")
 topScreen.leftTo = nil   -- (the fake screen stays, so the rest of the test can continue)
 Press("Down"); Press("Up")
 check(Press("Start") == true, "Start should begin a section")

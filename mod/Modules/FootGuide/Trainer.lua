@@ -335,15 +335,14 @@ local function TrainerPanel(pn)
 	local function Drill() return Child("Drill") end
 	local function SetHint(text) Child("Hint"):settext(text) end
 
-	-- Back to song select. This screen type doesn't act on Back by itself,
-	-- so the trainer has to start the transition.
+	-- Back to Player Options for the same song, where you can practise again
+	-- (Start) or change the Foot Guide mode and play it. This screen type
+	-- doesn't act on Back by itself, so the trainer starts the transition.
 	local function LeaveScreen()
 		local screen = SCREENMAN:GetTopScreen()
 		if s.leaving or not screen then return end
 		s.leaving = true
-		local ok, nextScreen = pcall(SelectMusicOrCourse)
-		if not ok or type(nextScreen) ~= "string" then nextScreen = "ScreenSelectMusic" end
-		screen:SetNextScreenName(nextScreen):StartTransitioningScreen("SM_GoToNextScreen")
+		screen:SetNextScreenName("ScreenPlayerOptions"):StartTransitioningScreen("SM_GoToNextScreen")
 	end
 
 	local function StopAudio()
@@ -364,14 +363,14 @@ local function TrainerPanel(pn)
 		Drill():visible(phase == "drill" or phase == "done")
 		Child("Status"):visible(phase == "loading" or phase == "error")
 		if phase == "menu" then
-			SetHint("Up/Down: section   Left/Right: step by step or with music   Start: practice   Back: song select")
+			SetHint("Up/Down: section   Left/Right: step by step or with music   Start: practice   Back: options")
 		elseif phase == "drill" then
 			SetHint(s.music and "Step when the arrows reach the line; the music waits for you   Start: restart   Back: sections"
 				or "Watch the demo, then step on the glowing arrows   Start: restart   Back: sections")
 		elseif phase == "done" then
 			SetHint("Start: go again   Back: choose another section")
 		elseif phase == "error" then
-			SetHint("Back: return to song select")
+			SetHint("Back: return to options")
 		end
 	end
 

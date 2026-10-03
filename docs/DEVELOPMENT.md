@@ -50,7 +50,7 @@ The weights were tuned with `tests/compare.lua`. It compares the solver's crosso
 ## Engine details worth knowing
 
 - **Input events.** `event.button` is the physical button (pad panels are `"Left"`, `"Down"`, ...). `event.GameButton` is its menu meaning (`"MenuUp"`, `"Start"`, `"Back"`, ...). Return `true` from an input callback when you have handled the input yourself.
-- **Back on a ScreenWithMenuElements** does nothing by default; the trainer starts the transition itself (`SetNextScreenName(...):StartTransitioningScreen("SM_GoToNextScreen")`).
+- **Back on a ScreenWithMenuElements** does nothing by default; the trainer starts the transition itself, back to `ScreenPlayerOptions` for the same song (`SetNextScreenName("ScreenPlayerOptions"):StartTransitioningScreen("SM_GoToNextScreen")`).
 - **Badges** are positioned with `ArrowEffects.GetYOffset / GetXPos / GetYPos / GetAlpha`, composed with the transforms of `PlayerP1` and its `NoteField` child. Mini comes from the NoteField's zoom. The code checks at runtime whether ArrowEffects columns are 1-based or 0-based.
 - **Music in the trainer** uses `SOUND:PlayMusicPart(path, start, length, fadeIn, fadeOut, loop, applyRate)` and `SOUND:StopMusic()`, with its own clock (`GetTimeSinceStart()` × music rate).
 
