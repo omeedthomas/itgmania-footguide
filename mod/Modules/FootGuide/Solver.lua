@@ -374,6 +374,62 @@ local function TransitionCost(s, nl, nr, opt, lOwned, rOwned, dt, tech)
 end
 
 -- ---------------------------------------------------------------------------
+-- Body direction
+--
+-- Which way the hips/shoulders face for a given foot placement, seen from
+-- above. Angles are in degrees: 0 = facing the screen, negative = turned to
+-- the player's right (clockwise from above), positive = turned left.
+-- A body facing angle a has its right hand pointing along (cos a, sin a) in
+-- pad coordinates (x right, y toward the screen); "legs crossed" is the angle
+-- between that and the left-foot -> right-foot direction. We pick the angle
+-- that best balances facing the screen against crossing the legs, never
+-- twisting the hips more than MAX_CROSS degrees against the feet (not
+-- physically possible), and turning smoothly from the previous step.
+
+Solver.Body = {
+	CROSS = 2,        -- cost of crossing the legs, relative to...
+	TURN = 1,         -- ...turning away from the screen
+	TURN_RATE = 0.3,  -- cost of turning from the previous step's direction
+	MAX_CROSS = 120,  -- hips can't twist further than this against the feet
+}
+
+local function WrapDeg(d)
+	d = d % 360
+	if d > 180 then d = d - 360 end
+	return d
+end
+Solver.WrapDeg = WrapDeg
+
+function Solver.Facing(lx, ly, rx, ry, previous)
+	local B = Solver.Body
+	local dx, dy = rx - lx, ry - ly
+	local len = math.sqrt(dx * dx + dy * dy)
+	previous = previous or 0
+	local best, bestCost = previous, math.huge
+	for deg = -180, 175, 5 do
+		local a = math.rad(deg)
+		local cross = 0
+		if len > EPS then
+			local c = (dx * math.cos(a) + dy * math.sin(a)) / len
+			cross = math.deg(math.acos(math.max(-1, math.min(1, c))))
+		end
+		if cross <= B.MAX_CROSS then
+			local cost = B.CROSS * (cross / 180) ^ 2
+				+ B.TURN * (math.abs(deg) / 180) ^ 2
+				+ B.TURN_RATE * math.abs(WrapDeg(deg - previous)) / 180
+			if cost < bestCost then best, bestCost = deg, cost end
+		end
+	end
+	return best
+end
+
+-- Unit vector the body faces, in pad coordinates.
+function Solver.FacingVector(deg)
+	local a = math.rad(deg)
+	return -math.sin(a), math.cos(a)
+end
+
+-- ---------------------------------------------------------------------------
 -- Solve
 
 -- rows: from Solver.BuildRows. layoutName: "dance-single" or "dance-double".
@@ -477,6 +533,8 @@ function Solver.Solve(rows, layoutName, yield)
 
 	local stats = { crossovers = 0, footswitches = 0, brackets = 0, doublesteps = 0, jacks = 0, spins = 0 }
 	local out = {}
+	local startFacing = Solver.Facing(startState.l.x, startState.l.y, startState.r.x, startState.r.y, 0)
+	local facing = startFacing
 	for i, row in ipairs(rows) do
 		local st = path[i]
 		local feet, tech = {}, {}
@@ -498,9 +556,10 @@ function Solver.Solve(rows, layoutName, yield)
 				kind = note.kind, endTime = note.endTime,
 			}
 		end
+		facing = Solver.Facing(st.l.x, st.l.y, st.r.x, st.r.y, facing)
 		out[i] = {
 			beat = row.beat, time = row.time, notes = notes, tech = tech, cost = st.cost,
-			L = Snapshot(st.l), R = Snapshot(st.r),
+			L = Snapshot(st.l), R = Snapshot(st.r), facing = facing,
 			movedL = st.opt ~= nil and #st.opt.left > 0,
 			movedR = st.opt ~= nil and #st.opt.right > 0,
 		}
@@ -511,6 +570,7 @@ function Solver.Solve(rows, layoutName, yield)
 		rows = out,
 		startL = Snapshot(startState.l),
 		startR = Snapshot(startState.r),
+		startFacing = startFacing,
 		stats = stats,
 		cost = frontier[1].cost,
 	}

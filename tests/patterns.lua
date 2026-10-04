@@ -86,4 +86,42 @@ Check("quad = two brackets", "LDUR L R", S8, { "LLRR L R", "LRLR L R" }, { tech 
 Check("no spin on L R trills", "L R L R L R", S16, "L R L R L R", { notech = "spin" })
 Check("drill U D", "U D U D U D", S16, { "L R L R L R", "R L R L R L" }, { notech = "doublestep" })
 
+-- Body direction: which way the hips face, and which leg crosses in front.
+local P = { L = { 0, 1 }, D = { 1, 0 }, U = { 1, 2 }, R = { 2, 1 } }
+local function CheckBody(name, l, r, previous, lo, hi, frontLeg)
+	local f = Solver.Facing(P[l][1], P[l][2], P[r][1], P[r][2], previous)
+	local fx, fy = Solver.FacingVector(f)
+	local ahead = (P[l][1] - P[r][1]) * fx + (P[l][2] - P[r][2]) * fy
+	local front = math.abs(ahead) < 0.3 and "-" or (ahead > 0 and "L" or "R")
+	local ok = f >= lo and f <= hi and (frontLeg == nil or front == frontLeg)
+	if ok then pass = pass + 1 else fail = fail + 1 end
+	print(string.format("%s %-30s facing %4d, front leg %s", ok and "PASS" or "FAIL", name, f, front))
+	if not ok then print(("     expected facing %d..%d, front leg %s"):format(lo, hi, tostring(frontLeg))) end
+end
+CheckBody("body: normal stance", "L", "R", 0, -10, 10, "-")
+CheckBody("body: L-D-R crossover in front", "R", "D", 0, -100, -45, "L")
+CheckBody("body: L-U-R crossover behind", "R", "U", 0, 45, 100, "R")
+CheckBody("body: R-D-L crossover in front", "D", "L", 0, 45, 100, "R")
+CheckBody("body: U+D half turn", "U", "D", 0, -90, -30, nil)
+CheckBody("body: spin keeps turning right", "R", "L", -80, -150, -95, nil)
+CheckBody("body: spin keeps turning left", "R", "L", 80, 95, 150, nil)
+-- Never twisted further than the hips allow.
+local worst = 0
+for _, l in pairs(P) do
+	for _, r in pairs(P) do
+		local f = Solver.Facing(l[1], l[2], r[1], r[2], 0)
+		local dx, dy = r[1] - l[1], r[2] - l[2]
+		local len = math.sqrt(dx * dx + dy * dy)
+		if len > 0 then
+			local a = math.rad(f)
+			local c = (dx * math.cos(a) + dy * math.sin(a)) / len
+			worst = math.max(worst, math.deg(math.acos(math.max(-1, math.min(1, c)))))
+		end
+	end
+end
+local ok = worst <= Solver.Body.MAX_CROSS + 1e-6
+if ok then pass = pass + 1 else fail = fail + 1 end
+print(string.format("%s %-30s worst hip twist %d degrees (limit %d)", ok and "PASS" or "FAIL",
+	"body: anatomically possible", math.floor(worst + 0.5), Solver.Body.MAX_CROSS))
+
 print(string.format("%d passed, %d failed", pass, fail))

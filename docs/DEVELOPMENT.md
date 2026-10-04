@@ -45,6 +45,28 @@ It's a dynamic-programming search (beam width 48) over states of the form *(left
 | `STACKED` | 15 | feet vertically aligned (Up + Down) |
 | `DISTANCE` | 10 | per panel-width of foot travel |
 
+### Body direction
+
+`Solver.Facing(lx, ly, rx, ry, previous)` returns which way the hips face, in degrees: 0 means facing the screen, and negative means turned to the player's right. Every solved row gets a `facing`, computed in order, so turns are continuous.
+
+For each candidate angle (in 5-degree steps), the cost is:
+
+```
+CROSS * (crossing / 180)^2 + TURN * (|angle| / 180)^2 + TURN_RATE * |change from previous| / 180
+```
+
+Here `crossing` is the angle between the body's right-hand direction and the left-foot-to-right-foot direction. Angles where `crossing` exceeds `MAX_CROSS` (120 degrees, beyond what hips can twist) are never chosen. The leg whose foot is further along the facing direction is the front leg. That's how the trainer decides between "across in front of" and "around behind", and which leg it draws on top.
+
+Some reference results:
+
+| Stance | Facing | Front leg |
+|---|---|---|
+| L-D-R crossover (left foot on Right, right foot on Down) | -80 (turned right) | left (in front) |
+| L-U-R crossover (left foot on Right, right foot on Up) | +80 (turned left) | right, so the left leg goes behind |
+| Halfway through a spin | keeps the direction it was already turning | |
+
+These are checked by `npm test`.
+
 The weights were tuned with `tests/compare.lua`. It compares the solver's crossover, footswitch, bracket and doublestep counts against the `#TECHCOUNTS` that ITGmania stores in its song cache, and those come from ITGmania's own C++ StepParity solver.
 
 ## Engine details worth knowing

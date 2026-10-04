@@ -438,24 +438,65 @@ local menu = tp:GetChild("Menu")
 check(menu:GetChild("Mode").text:find("STEP BY STEP"), "default mode should be step by step")
 Press("Start")
 local helps, animated, steps = {}, 0, 0
+local crossFront, crossBehind, bodyTurns, legChecks = nil, nil, 0, 0
+local body = padAF:GetChild("Body")
+-- Each leg must run from a hip (near the middle of the body) to exactly one foot.
+local function LegEnds(leg)
+	local len = leg.calls.zoomto[2]
+	local a = math.rad(leg.calls.rotationz[1] + 90)
+	local dx, dy = math.cos(a) * len / 2, math.sin(a) * len / 2
+	return { leg.px + dx, leg.py + dy }, { leg.px - dx, leg.py - dy }
+end
+local function LegsAttached()
+	-- (both feet can be drawn at the same spot mid-footswitch, so check each leg reaches a foot)
+	local feet = { padAF:GetChild("FootL"), padAF:GetChild("FootR") }
+	for _, legName in ipairs({ "LegFront", "LegBack" }) do
+		local e1, e2 = LegEnds(body:GetChild(legName))
+		local reaches = false
+		for _, foot in ipairs(feet) do
+			for _, e in ipairs({ e1, e2 }) do
+				if math.abs(e[1] - foot.px) < 0.01 and math.abs(e[2] - foot.py) < 0.01 then reaches = true end
+			end
+		end
+		if not reaches then return false end
+	end
+	return true
+end
+local lastTorso
 for _ = 1, 5000 do
 	if Visible(drill:GetChild("Result")) then break end
 	local help = drill:GetChild("Help").text or ""
-	for line in help:gmatch("[^\n]+") do helps[line:match("^(%a+)") or line] = helps[line:match("^(%a+)") or line] or line end
-	-- the demo loop must actually move the feet
+	for line in help:gmatch("[^\n]+") do
+		local key = line:match("^%(?(%a+)") or line
+		helps[key] = helps[key] or line
+		if line:find("^Crossover") and line:find("in front of") then crossFront = crossFront or line end
+		if line:find("^Crossover") and line:find("behind") then crossBehind = crossBehind or line end
+	end
+	-- the demo loop must actually move the feet, and the body must follow them
 	TFrames(0.1); local a = FeetPos()
+	check(Visible(body), "body hidden in the trainer")
+	if LegsAttached() then legChecks = legChecks + 1 end
 	TFrames(0.6); local b = FeetPos()
+	if LegsAttached() then legChecks = legChecks + 1 end
 	if a ~= b then animated = animated + 1 end
+	local torso = body:GetChild("Torso").calls.rotationz[1]
+	if lastTorso and math.abs(torso - lastTorso) > 20 then bodyTurns = bodyTurns + 1 end
+	lastTorso = torso
 	DoStep()
 	steps = steps + 1
 end
 check(Visible(drill:GetChild("Result")), "whole chart never finished")
 check(animated > steps * 0.5, ("demo animation only moved on %d of %d steps"):format(animated, steps))
-print(("Step by step, whole chart: %d steps, demo moved the feet on %d"):format(steps, animated))
+check(legChecks == 2 * steps, ("legs not attached to the feet on %d of %d frames checked"):format(2 * steps - legChecks, 2 * steps))
+check(bodyTurns > 0, "the body never turned")
+print(("Step by step, whole chart: %d steps, demo moved the feet on %d, body turned on %d; legs always attached to the feet"):format(
+	steps, animated, bodyTurns))
 print("  Explanations seen:")
-for _, key in ipairs({ "Footswitch", "Crossover", "Bracket", "Jump", "Spin", "Doublestep", "Jack", "Hold", "Keep" }) do
+for _, key in ipairs({ "Footswitch", "Crossover", "Bracket", "Jump", "Spin", "Body", "Still", "Doublestep", "Jack", "Hold", "Keep" }) do
 	if helps[key] then print("    " .. helps[key]) end
 end
+if crossFront then print("    " .. crossFront) end
+if crossBehind then print("    " .. crossBehind) end
 check(helps["Crossover"], "no crossover explanation on a chart with crossovers")
 
 -- ---------------------------------------------------------------- with music

@@ -23,6 +23,9 @@ local Config = {
 	BadgeOpacity   = 0.9,
 	TrickyLeadIn   = 2,      -- Tricky Only also marks this many steps before each tricky step
 
+	-- Pad diagrams (side panel and trainer)
+	ShowBody       = true,   -- see-through legs, hips and head showing how the body turns
+
 	-- Side Panel
 	Side           = "auto", -- "auto", "left" or "right" of the notefield
 	LookAhead      = 2.0,    -- seconds of upcoming steps shown in the lane
@@ -304,6 +307,16 @@ local function PadDef(name, extra)
 		}
 	end
 	for _, actor in ipairs(extra or {}) do pad[#pad+1] = actor end
+	-- A see-through body seen from above: legs from the hips to each foot,
+	-- shoulders, head and a small arrow showing which way the body faces.
+	pad[#pad+1] = Def.ActorFrame{
+		Name = "Body",
+		Def.Quad{ Name = "LegBack" },     -- the leg further back
+		Disc(100, "Torso"),
+		Def.Quad{ Name = "LegFront" },    -- the leg further forward, drawn on top
+		Disc(100, "Head"),
+		Arrow(20, "Nose"),
+	}
 	pad[#pad+1] = Foot("GhostL", "L", LeftColor)
 	pad[#pad+1] = Foot("GhostR", "R", RightColor)
 	pad[#pad+1] = Foot("FootL", "L", LeftColor)
@@ -353,6 +366,46 @@ local function SetupPad(padAF, layout, panelSize, top)
 		return px, py, rot
 	end
 
+	-- Draws the body for feet at pixel positions (xL,yL) and (xR,yR), facing
+	-- `deg` degrees (0 = the screen, negative = turned to the player's right).
+	local body = padAF:GetChild("Body")
+	body:visible(false)
+	function pad.DrawBody(xL, yL, xR, yR, deg)
+		if not Config.ShowBody or not deg then body:visible(false) return end
+		body:visible(true)
+		local a = math.rad(deg)
+		local fx, fy = -math.sin(a), -math.cos(a)   -- facing (screen pixels, y down)
+		local rx, ry = math.cos(a), -math.sin(a)    -- the body's right-hand side
+		local px, py = (xL + xR) / 2, (yL + yR) / 2
+		local hip = 0.2 * panelSize
+		local atan2 = math.atan2 or math.atan
+
+		local function Leg(actor, hx, hy, x, y, col, alpha)
+			local dx, dy = x - hx, y - hy
+			local len = math.sqrt(dx * dx + dy * dy)
+			actor:xy((hx + x) / 2, (hy + y) / 2):zoomto(0.17 * panelSize, math.max(1, len))
+				:rotationz(math.deg(atan2(dy, dx)) - 90):diffuse(col):diffusealpha(alpha)
+		end
+		-- whichever foot is further forward (in the facing direction) is the front leg
+		local leftForward = (xL - px) * fx + (yL - py) * fy >= (xR - px) * fx + (yR - py) * fy
+		local frontIsLeft = leftForward
+		local lhx, lhy = px - rx * hip, py - ry * hip
+		local rhx, rhy = px + rx * hip, py + ry * hip
+		if frontIsLeft then
+			Leg(body:GetChild("LegFront"), lhx, lhy, xL, yL, LeftColor, 0.55)
+			Leg(body:GetChild("LegBack"), rhx, rhy, xR, yR, RightColor, 0.28)
+		else
+			Leg(body:GetChild("LegFront"), rhx, rhy, xR, yR, RightColor, 0.55)
+			Leg(body:GetChild("LegBack"), lhx, lhy, xL, yL, LeftColor, 0.28)
+		end
+		body:GetChild("Torso"):xy(px, py):rotationz(math.deg(atan2(ry, rx)))
+			:zoomx(0.8 * panelSize / 100):zoomy(0.34 * panelSize / 100):diffuse(1, 1, 1, 0.22)
+		body:GetChild("Head"):xy(px + fx * 0.04 * panelSize, py + fy * 0.04 * panelSize)
+			:zoom(0.3 * panelSize / 100):diffuse(1, 1, 1, 0.45)
+		body:GetChild("Nose"):xy(px + fx * 0.3 * panelSize, py + fy * 0.3 * panelSize)
+			:rotationz(math.deg(atan2(fy, fx)) + 90):zoom(panelSize / 70):diffuse(1, 1, 1, 0.8)
+	end
+
 	local function Place(actor, placement, animate, alpha)
 		if not placement then actor:visible(false) return end
 		local px, py, rot = pad.Where(placement)
@@ -364,9 +417,17 @@ local function SetupPad(padAF, layout, panelSize, top)
 
 	-- L/R: where the feet are now. nextRow: the step to show as ghost feet +
 	-- glowing panels. pressed: optional { [col] = true } drawn in white.
-	function pad.Show(L, R, nextRow, animate, pressed)
+	-- facing: body direction in degrees (draws the body), or nil.
+	function pad.Show(L, R, nextRow, animate, pressed, facing)
 		Place(padAF:GetChild("FootL"), L, animate)
 		Place(padAF:GetChild("FootR"), R, animate)
+		if L and R then
+			local xL, yL = pad.Where(L)
+			local xR, yR = pad.Where(R)
+			pad.DrawBody(xL, yL, xR, yR, facing)
+		else
+			pad.DrawBody(0, 0, 0, 0, nil)
+		end
 		Place(padAF:GetChild("GhostL"), nextRow and nextRow.movedL and nextRow.L or nil, false, 0.35)
 		Place(padAF:GetChild("GhostR"), nextRow and nextRow.movedR and nextRow.R or nil, false, 0.35)
 		local glow = {}
@@ -551,7 +612,8 @@ local function GameplayOverlay(pn)
 		if s.shownRow == cur then return end
 		s.shownRow = cur
 		local row = rows[cur]
-		s.pad.Show(row and row.L or s.result.startL, row and row.R or s.result.startR, rows[cur + 1], true)
+		s.pad.Show(row and row.L or s.result.startL, row and row.R or s.result.startR, rows[cur + 1], true, nil,
+			row and row.facing or s.result.startFacing)
 	end
 
 	local function UpdateLane(P, rows, now)

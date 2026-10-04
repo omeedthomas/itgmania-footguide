@@ -21,7 +21,7 @@ Pick a mode for each player on the **Player Options** screen (press Start again 
 | **Off** | Nothing. This is the default. |
 | **On Notes** | An **L** (blue) or **R** (orange) badge on every arrow in your notefield. Tricky steps get a yellow ring and a tag: `XO` crossover, `FS` footswitch, `BR` bracket, `SPIN`, and `DS` (unavoidable doublestep). |
 | **Tricky Only** | The same badges, but only on tricky steps and the two steps leading into each. Use this once the basics are automatic. |
-| **Side Panel** | A dance-pad diagram showing where your feet should be, plus a scrolling L/R lane, beside the notefield. |
+| **Side Panel** | A dance-pad diagram showing where your feet should be and how your body is turned, plus a scrolling L/R lane, beside the notefield. |
 | **Trainer** | Practise instead of playing (see below). |
 
 The badges follow your speed mod, Mini, Reverse, notefield offset and Hidden/Sudden. Each player's choice is remembered. With a keyboard, **Ctrl+F** turns the guide on and off for everyone.
@@ -37,8 +37,13 @@ The badges follow your speed mod, Mini, Reverse, notefield offset and Hidden/Sud
    - **Footswitches:** the foot already on the panel visibly lifts off as the other one lands.
    - **Jumps:** both feet move together.
    - **Brackets:** the foot sits heel-and-toe across two panels.
+   - **The body:** a see-through body, seen from above, turns along with the step: legs from the hips to each foot, plus shoulders and a head with a small arrow showing which way you face. When your legs cross, the leg that goes **in front** is drawn brighter and on top, so you can tell a front crossover from a behind one, and a crossover from a spin. The body never twists further than real hips can.
 
-   Plain-language tips explain what's going on, for example *"Footswitch: lift your RIGHT foot off DOWN as your LEFT foot lands on it."* Press the wrong panel and it buzzes and counts a mistake.
+   Plain-language tips explain what's going on, for example:
+   - *"Footswitch: lift your RIGHT foot off DOWN as your LEFT foot lands on it."*
+   - *"Crossover: turn your hips about 75 degrees to your right and bring your LEFT leg across in front of your RIGHT leg."*
+
+   Press the wrong panel and it buzzes and counts a mistake.
 4. **Repeat until clean.** The trainer counts your clean runs in a row. **Back** returns to the section list, and from there to Player Options for the same song, where you can start the trainer again or switch Foot Guide to another mode and play the song.
 
 A good learning routine:

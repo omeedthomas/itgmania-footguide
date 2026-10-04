@@ -12,6 +12,7 @@
 -- Loaded by Modules/FootGuide.lua, which passes in shared helpers.
 
 local ctx = ...
+local Solver = ctx.Solver
 local StartAnalysis, TECHS = ctx.StartAnalysis, ctx.TECHS
 local PadDef, SetupPad, Arrow, FootColor = ctx.PadDef, ctx.SetupPad, ctx.Arrow, ctx.FootColor
 local ROTATION, TechColor, WarnColor = ctx.ROTATION, ctx.TechColor, ctx.WarnColor
@@ -146,6 +147,8 @@ local function StepInfo(s, i)
 		from = { L = before and before.L or s.result.startL, R = before and before.R or s.result.startR },
 		to = { L = row.L, R = row.R },
 		moved = { L = row.movedL, R = row.movedR },
+		fromFacing = before and before.facing or s.result.startFacing or 0,
+		toFacing = row.facing or 0,
 	}
 	-- A footswitch: the foot already standing on the panel has to get off.
 	for _, note in ipairs(row.notes) do
@@ -190,12 +193,28 @@ local function Explain(s, info)
 	end
 	local mover = info.moved.L and "L" or "R"
 	local other = (mover == "L") and "R" or "L"
+	-- Is the moving foot ahead of or behind the other one, along the way the body faces?
+	local fx, fy = Solver.FacingVector(info.toFacing)
+	local m, o = info.to[mover], info.to[other]
+	local inFront = ((m.x - o.x) * fx + (m.y - o.y) * fy) >= 0
+	local turn = Solver.WrapDeg(info.toFacing - info.fromFacing)
+	local function Side(deg) return deg < 0 and "right" or "left" end
+	local function About(deg) return math.floor(math.abs(deg) / 15 + 0.5) * 15 end
 	if row.tech.crossover then
-		how[#how+1] = ("Crossover: turn your hips and bring your %s foot across in front of your %s foot."):format(
-			FOOT_WORD[mover], FOOT_WORD[other])
+		how[#how+1] = ("Crossover: turn your hips about %d%s to your %s and bring your %s leg %s your %s leg."):format(
+			About(info.toFacing), " degrees", Side(info.toFacing), FOOT_WORD[mover],
+			inFront and "across in front of" or "around behind", FOOT_WORD[other])
 	end
 	if row.tech.spin then
-		how[#how+1] = "Spin: you end up facing away from the screen; turn your whole body with the step."
+		how[#how+1] = ("Spin: keep turning %s (to your %s) until you're about %d%s from the screen; turn your whole body, not just your legs."):format(
+			turn < 0 and "clockwise" or "counter-clockwise", Side(turn), About(info.toFacing), " degrees")
+	end
+	if not row.tech.crossover and not row.tech.spin and math.abs(turn) >= 30 then
+		if math.abs(info.toFacing) < 20 then
+			how[#how+1] = "Body: turn back to face the screen."
+		else
+			how[#how+1] = ("Body: turn about %d%s to your %s."):format(About(info.toFacing), " degrees", Side(info.toFacing))
+		end
 	end
 	for _, f in ipairs({ "L", "R" }) do
 		local p = info.to[f]
@@ -227,8 +246,9 @@ local function Explain(s, info)
 			how[#how+1] = ("Keep holding %s with your %s foot."):format(PanelName(layout, h.col), FOOT_WORD[h.foot])
 		end
 	end
-	if info.to.L.x > info.to.R.x + 1e-6 then
-		how[#how+1] = "(Your feet are crossed here: hips turned.)"
+	if info.to.L.x > info.to.R.x + 1e-6 and not row.tech.crossover and not row.tech.spin then
+		how[#how+1] = ("(Still crossed: hips turned about %d%s to your %s.)"):format(
+			About(info.toFacing), " degrees", Side(info.toFacing))
 	end
 	return headline, table.concat(how, "\n")
 end
@@ -451,13 +471,13 @@ local function TrainerPanel(pn)
 		if s.phase == "done" then
 			local last = s.rows[s.section.last]
 			s.info = nil
-			s.pad.Show(last.L, last.R, nil, false)
+			s.pad.Show(last.L, last.R, nil, false, nil, last.facing)
 			HideDots()
 			return
 		end
 		local info = StepInfo(s, s.i)
 		s.info = info
-		s.pad.Show(info.from.L, info.from.R, info.row, false, s.pressed)
+		s.pad.Show(info.from.L, info.from.R, info.row, false, s.pressed, info.fromFacing)
 
 		local headline, how = Explain(s, info)
 		if s.i == s.section.first and s.mistakes == 0 and next(s.pressed) == nil and not s.music then
@@ -492,14 +512,17 @@ local function TrainerPanel(pn)
 		local info = s.info
 		if not info then return end
 		local PadAF = Drill():GetChild("Pad")
+		local at = {}   -- where each foot is drawn this frame, for the body
 		for _, f in ipairs({ "L", "R" }) do
 			local actor = PadAF:GetChild("Foot" .. f)
 			local x1, y1, r1 = s.pad.Where(info.from[f])
+			at[f] = { x1, y1 }
 			if info.moved[f] then
 				local x2, y2, r2 = s.pad.Where(info.to[f])
 				local e = Smooth(p)
+				at[f] = { x1 + (x2 - x1) * e, y1 + (y2 - y1) * e }
 				actor:visible(true):stoptweening()
-					:xy(x1 + (x2 - x1) * e, y1 + (y2 - y1) * e):rotationz(r1 + (r2 - r1) * e)
+					:xy(at[f][1], at[f][2]):rotationz(r1 + (r2 - r1) * e)
 					:zoom(1 + 0.22 * math.sin(math.pi * e)):diffusealpha(1)
 			elseif info.switch and info.switch.other == f then
 				-- footswitch: this foot lifts off and drifts toward where it goes next
@@ -509,14 +532,18 @@ local function TrainerPanel(pn)
 					tx, ty = x1 + (nx - x1) * 0.45, y1 + (ny - y1) * 0.45
 				end
 				local e = Smooth(lift)
+				at[f] = { x1 + (tx - x1) * e, y1 + (ty - y1) * e }
 				actor:visible(true):stoptweening()
-					:xy(x1 + (tx - x1) * e, y1 + (ty - y1) * e):rotationz(r1)
+					:xy(at[f][1], at[f][2]):rotationz(r1)
 					:zoom(1 + 0.18 * e):diffusealpha(1 - 0.5 * e)
 			else
 				actor:visible(true):stoptweening():xy(x1, y1):rotationz(r1):zoom(1)
 					:diffusealpha(info.from[f].kind == "float" and 0.45 or 1)
 			end
 		end
+		-- the body turns along with the step (the short way round, so spins keep their direction)
+		local facing = info.fromFacing + Solver.WrapDeg(info.toFacing - info.fromFacing) * Smooth(p)
+		s.pad.DrawBody(at.L[1], at.L[2], at.R[1], at.R[2], facing)
 	end
 
 	-- Looping demonstration (step by step, or while the music waits).
