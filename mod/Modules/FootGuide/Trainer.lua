@@ -1,10 +1,9 @@
 -- FootGuide Trainer: the actors for ScreenFootGuideTrainer.
 --
 -- Pick a section of the chart (the trickiest 2-measure stretches are listed
--- first) and a way to practise it:
---   Step by step - nothing moves until you press the right panel(s)
---   With music   - the song plays and the notes scroll; the music pauses
---                  whenever a step reaches the line and you haven't hit it yet
+-- first). The song plays and the notes scroll up to a line; the music pauses
+-- whenever a step reaches the line and you haven't hit it yet. (Only a song
+-- with no music file falls back to simply waiting at every step.)
 -- Each step is demonstrated on a big pad: the moving foot slides along a
 -- dotted path to where it lands, and for footswitches the foot already on
 -- the panel visibly lifts off as the other one lands.
@@ -150,6 +149,9 @@ local function StepInfo(s, i)
 		fromFacing = before and before.facing or s.result.startFacing or 0,
 		toFacing = row.facing or 0,
 	}
+	-- how the body was already turning on the step before (to say "keep turning")
+	local twoBefore = s.rows[i - 2]
+	info.prevTurn = before and (info.fromFacing - (twoBefore and twoBefore.facing or s.result.startFacing or 0)) or 0
 	-- A footswitch: the foot already standing on the panel has to get off.
 	for _, note in ipairs(row.notes) do
 		local f = note.foot
@@ -197,24 +199,36 @@ local function Explain(s, info)
 	local fx, fy = Solver.FacingVector(info.toFacing)
 	local m, o = info.to[mover], info.to[other]
 	local inFront = ((m.x - o.x) * fx + (m.y - o.y) * fy) >= 0
-	local turn = Solver.WrapDeg(info.toFacing - info.fromFacing)
+	-- Turns are described as the turn you actually make on this step (facing
+	-- angles keep counting through spins, so this is never the "long way").
+	local turn = info.toFacing - info.fromFacing
 	local function Side(deg) return deg < 0 and "right" or "left" end
-	local function About(deg) return math.floor(math.abs(deg) / 15 + 0.5) * 15 end
+	local function About(deg) return math.max(15, math.floor(math.abs(deg) / 15 + 0.5) * 15) end
+	local function Ends(deg)   -- where the body ends up, in words
+		local w = Solver.WrapDeg(deg)
+		if math.abs(w) < 20 then return "facing the screen" end
+		if math.abs(w) <= 65 then return "half-turned to your " .. Side(w) end
+		if math.abs(w) <= 120 then return "facing the " .. Side(w) .. " wall" end
+		return "with your back to the screen"
+	end
+	local keepGoing = info.prevTurn * turn > 0 and math.abs(info.prevTurn) >= 15
+	local function Turning()
+		if math.abs(turn) < 15 then return "" end
+		return (", %s about %d degrees to your %s (%s)"):format(keepGoing and "still turning" or "turning",
+			About(turn), Side(turn), Ends(info.toFacing))
+	end
 	if row.tech.crossover then
-		how[#how+1] = ("Crossover: turn your hips about %d%s to your %s and bring your %s leg %s your %s leg."):format(
-			About(info.toFacing), " degrees", Side(info.toFacing), FOOT_WORD[mover],
-			inFront and "across in front of" or "around behind", FOOT_WORD[other])
+		how[#how+1] = ("Crossover: bring your %s leg %s your %s leg%s."):format(FOOT_WORD[mover],
+			inFront and "across in front of" or "around behind", FOOT_WORD[other], Turning())
 	end
 	if row.tech.spin then
-		how[#how+1] = ("Spin: keep turning %s (to your %s) until you're about %d%s from the screen; turn your whole body, not just your legs."):format(
-			turn < 0 and "clockwise" or "counter-clockwise", Side(turn), About(info.toFacing), " degrees")
+		how[#how+1] = ("Spin: %s %s (to your %s) about %d degrees, ending %s. Turn your whole body, not just your legs."):format(
+			keepGoing and "keep turning" or "turn", turn < 0 and "clockwise" or "counter-clockwise", Side(turn),
+			About(turn), Ends(info.toFacing))
 	end
 	if not row.tech.crossover and not row.tech.spin and math.abs(turn) >= 30 then
-		if math.abs(info.toFacing) < 20 then
-			how[#how+1] = "Body: turn back to face the screen."
-		else
-			how[#how+1] = ("Body: turn about %d%s to your %s."):format(About(info.toFacing), " degrees", Side(info.toFacing))
-		end
+		how[#how+1] = ("Body: %s about %d degrees to your %s, ending %s."):format(
+			keepGoing and "keep turning" or "turn", About(turn), Side(turn), Ends(info.toFacing))
 	end
 	for _, f in ipairs({ "L", "R" }) do
 		local p = info.to[f]
@@ -247,8 +261,7 @@ local function Explain(s, info)
 		end
 	end
 	if info.to.L.x > info.to.R.x + 1e-6 and not row.tech.crossover and not row.tech.spin then
-		how[#how+1] = ("(Still crossed: hips turned about %d%s to your %s.)"):format(
-			About(info.toFacing), " degrees", Side(info.toFacing))
+		how[#how+1] = ("(Still crossed: you're %s.)"):format(Ends(info.toFacing))
 	end
 	return headline, table.concat(how, "\n")
 end
@@ -286,13 +299,15 @@ local function TrainerPanel(pn)
 	menu[#menu+1] = Text("Prompt", "Common Normal", 0.7, function(self)
 		self:y(74):diffuse(TechColor):settext("Choose what to practice (Up/Down), then press Start")
 	end)
-	menu[#menu+1] = Text("Mode", "Common Bold", 0.62, function(self) self:y(98) end)
+	menu[#menu+1] = Text("About", "Common Normal", 0.6, function(self)
+		self:y(98):diffusealpha(0.8):settext("The song plays and pauses whenever an arrow reaches the line before you've stepped.")
+	end)
 	menu[#menu+1] = Def.Quad{ Name = "Cursor", InitCommand = function(self) self:zoomto(W - 60, 28):diffuse(1, 1, 1, 0.12) end }
 	for i = 1, MENU_ITEMS do
 		menu[#menu+1] = Def.ActorFrame{
 			Name = "Item" .. i,
-			Text("Label", "Common Bold", 0.6, function(self) self:halign(0):x(-W / 2 + 44) end),
-			Text("Detail", "Common Normal", 0.6, function(self) self:halign(1):x(W / 2 - 44):diffusealpha(0.85) end),
+			Text("Label", "Common Bold", 0.42, function(self) self:halign(0):x(-W / 2 + 44):maxwidth((W / 2 - 60) / 0.42) end),
+			Text("Detail", "Common Normal", 0.6, function(self) self:halign(1):x(W / 2 - 44):diffusealpha(0.85):maxwidth((W / 2 - 60) / 0.6) end),
 		}
 	end
 	af[#af+1] = menu
@@ -383,7 +398,7 @@ local function TrainerPanel(pn)
 		Drill():visible(phase == "drill" or phase == "done")
 		Child("Status"):visible(phase == "loading" or phase == "error")
 		if phase == "menu" then
-			SetHint("Up/Down: section   Left/Right: step by step or with music   Start: practice   Back: options")
+			SetHint("Up/Down: section   Start: practice   Back: options")
 		elseif phase == "drill" then
 			SetHint(s.music and "Step when the arrows reach the line; the music waits for you   Start: restart   Back: sections"
 				or "Watch the demo, then step on the glowing arrows   Start: restart   Back: sections")
@@ -396,9 +411,6 @@ local function TrainerPanel(pn)
 
 	local function DrawMenu()
 		local M = Child("Menu")
-		M:GetChild("Mode"):settext(s.music
-			and "<  WITH MUSIC: the song plays and pauses until you step  >"
-			or  "<  STEP BY STEP: nothing moves until you step  >")
 		for i = 1, MENU_ITEMS do
 			local item = M:GetChild("Item" .. i)
 			local section = s.sections[i]
@@ -541,8 +553,9 @@ local function TrainerPanel(pn)
 					:diffusealpha(info.from[f].kind == "float" and 0.45 or 1)
 			end
 		end
-		-- the body turns along with the step (the short way round, so spins keep their direction)
-		local facing = info.fromFacing + Solver.WrapDeg(info.toFacing - info.fromFacing) * Smooth(p)
+		-- the body turns along with the step (facing keeps counting through spins,
+		-- so this always turns the way the body really goes)
+		local facing = info.fromFacing + (info.toFacing - info.fromFacing) * Smooth(p)
 		s.pad.DrawBody(at.L[1], at.L[2], at.R[1], at.R[2], facing)
 	end
 
@@ -628,15 +641,15 @@ local function TrainerPanel(pn)
 	local function BeginSection(index)
 		StopAudio()
 		s.section = s.sections[index]
-		-- the clean-run streak counts repeats of the same section in the same mode
-		local key = index .. (s.music and "m" or "s")
-		if s.streakKey ~= key then s.streak, s.streakKey = 0, key end
+		-- the clean-run streak counts repeats of the same section
+		if s.streakKey ~= index then s.streak, s.streakKey = 0, index end
 		s.i = s.section.first
 		s.pressed, s.mistakes = {}, 0
 		s.demoStart, s.frozen, s.stopAt = Now(), false, nil
 		Drill():GetChild("Result"):visible(false)
+		-- (visible() needs a real true/false; nil is an error in the game)
 		Drill():GetChild("List"):visible(not s.music)
-		Drill():GetChild("Lane"):visible(s.music)
+		Drill():GetChild("Lane"):visible(s.music == true)
 		ShowPhase("drill")
 		if s.music then
 			s.clock = math.max(0, s.rows[s.i].time - PRE_ROLL * s.rate)
@@ -653,8 +666,8 @@ local function TrainerPanel(pn)
 		if s.streak > 1 then text = text .. ("   (%d clean in a row)"):format(s.streak) end
 		Drill():GetChild("Result"):visible(true):settext(text):diffuse(clean and GoodColor or TechColor)
 		Drill():GetChild("Instruction"):settext(s.streak >= 3
-			and "You've got this one. Try it with music, or pick another section."
-			or "Again until it's clean, then try it with music or in the song.")
+			and "You've got this one. Try it in the song, or pick another section."
+			or "Again until it's clean, then try it in the song.")
 		Drill():GetChild("Help"):settext("")
 		Play(SND_DONE)
 		s.stopAt = Now() + 1.0   -- let the music ring out briefly
@@ -757,9 +770,6 @@ local function TrainerPanel(pn)
 				s.menuIndex = math.max(1, s.menuIndex - 1); DrawMenu(); return true
 			elseif menuButton == "MenuDown" or panel == "Down" then
 				s.menuIndex = math.min(#s.sections, s.menuIndex + 1); DrawMenu(); return true
-			elseif first and (menuButton == "MenuLeft" or menuButton == "MenuRight" or panel == "Left" or panel == "Right") then
-				if s.musicPath then s.music = not s.music end
-				DrawMenu(); return true
 			elseif menuButton == "Start" and first then
 				BeginSection(s.menuIndex); return true
 			end
@@ -825,11 +835,12 @@ local function TrainerPanel(pn)
 		end
 		Child("Chart"):settext(chart)
 
-		-- Music for "with music" practice, at the player's chosen Music Rate.
+		-- Practice always plays the song (at the player's chosen Music Rate). Only
+		-- a song with no music file falls back to waiting at every step.
 		s.musicPath = song and song.GetMusicPath and song:GetMusicPath() or nil
 		local okRate, rate = pcall(function() return GAMESTATE:GetSongOptionsObject("ModsLevel_Preferred"):MusicRate() end)
 		s.rate = (okRate and type(rate) == "number" and rate > 0) and rate or 1
-		if not s.musicPath then s.music = false end
+		s.music = s.musicPath ~= nil and s.musicPath ~= ""
 
 		s.job = StartAnalysis(pn)
 		if s.job.err then

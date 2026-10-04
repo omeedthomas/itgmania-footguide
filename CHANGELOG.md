@@ -9,6 +9,10 @@
   - Spins say which way to turn.
   - Other big turns get a "Body:" line.
 - **New setting:** `ShowBody` in `Modules/FootGuide.lua`, to turn the body off.
+- **Body turns that are actually possible:** the body only turns along paths where the hips never twist further than real hips can, at every point of the step. Spins now keep turning the same way, about 90 degrees a step, instead of swinging back through the screen. (Reported from Break Down!, measures 6-7.)
+- **Tips describe the turn you make** ("still turning about 45 degrees to your right, ending facing the right wall"), not an absolute angle.
+- **The trainer always practises with the music.** The step-by-step option is gone: it couldn't start a section, and music practice covers the same need, because it pauses for as long as you need at every step you haven't taken. The Player Options help text was updated to match; re-run `install.ps1`.
+- The section menu's text no longer overflows the panel, and the body is drawn bolder.
 
 ## 1.0.1
 

@@ -377,13 +377,13 @@ local function SetupPad(padAF, layout, panelSize, top)
 		local fx, fy = -math.sin(a), -math.cos(a)   -- facing (screen pixels, y down)
 		local rx, ry = math.cos(a), -math.sin(a)    -- the body's right-hand side
 		local px, py = (xL + xR) / 2, (yL + yR) / 2
-		local hip = 0.2 * panelSize
+		local hip = 0.24 * panelSize
 		local atan2 = math.atan2 or math.atan
 
 		local function Leg(actor, hx, hy, x, y, col, alpha)
 			local dx, dy = x - hx, y - hy
 			local len = math.sqrt(dx * dx + dy * dy)
-			actor:xy((hx + x) / 2, (hy + y) / 2):zoomto(0.17 * panelSize, math.max(1, len))
+			actor:xy((hx + x) / 2, (hy + y) / 2):zoomto(0.24 * panelSize, math.max(1, len))
 				:rotationz(math.deg(atan2(dy, dx)) - 90):diffuse(col):diffusealpha(alpha)
 		end
 		-- whichever foot is further forward (in the facing direction) is the front leg
@@ -392,18 +392,18 @@ local function SetupPad(padAF, layout, panelSize, top)
 		local lhx, lhy = px - rx * hip, py - ry * hip
 		local rhx, rhy = px + rx * hip, py + ry * hip
 		if frontIsLeft then
-			Leg(body:GetChild("LegFront"), lhx, lhy, xL, yL, LeftColor, 0.55)
-			Leg(body:GetChild("LegBack"), rhx, rhy, xR, yR, RightColor, 0.28)
+			Leg(body:GetChild("LegFront"), lhx, lhy, xL, yL, LeftColor, 0.75)
+			Leg(body:GetChild("LegBack"), rhx, rhy, xR, yR, RightColor, 0.4)
 		else
-			Leg(body:GetChild("LegFront"), rhx, rhy, xR, yR, RightColor, 0.55)
-			Leg(body:GetChild("LegBack"), lhx, lhy, xL, yL, LeftColor, 0.28)
+			Leg(body:GetChild("LegFront"), rhx, rhy, xR, yR, RightColor, 0.75)
+			Leg(body:GetChild("LegBack"), lhx, lhy, xL, yL, LeftColor, 0.4)
 		end
 		body:GetChild("Torso"):xy(px, py):rotationz(math.deg(atan2(ry, rx)))
-			:zoomx(0.8 * panelSize / 100):zoomy(0.34 * panelSize / 100):diffuse(1, 1, 1, 0.22)
+			:zoomx(0.95 * panelSize / 100):zoomy(0.4 * panelSize / 100):diffuse(1, 1, 1, 0.35)
 		body:GetChild("Head"):xy(px + fx * 0.04 * panelSize, py + fy * 0.04 * panelSize)
-			:zoom(0.3 * panelSize / 100):diffuse(1, 1, 1, 0.45)
-		body:GetChild("Nose"):xy(px + fx * 0.3 * panelSize, py + fy * 0.3 * panelSize)
-			:rotationz(math.deg(atan2(fy, fx)) + 90):zoom(panelSize / 70):diffuse(1, 1, 1, 0.8)
+			:zoom(0.34 * panelSize / 100):diffuse(1, 1, 1, 0.6)
+		body:GetChild("Nose"):xy(px + fx * 0.36 * panelSize, py + fy * 0.36 * panelSize)
+			:rotationz(math.deg(atan2(fy, fx)) + 90):zoom(panelSize / 55):diffuse(1, 1, 1, 0.9)
 	end
 
 	local function Place(actor, placement, animate, alpha)

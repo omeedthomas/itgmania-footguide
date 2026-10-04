@@ -388,8 +388,8 @@ end
 
 Solver.Body = {
 	CROSS = 2,        -- cost of crossing the legs, relative to...
-	TURN = 1,         -- ...turning away from the screen
-	TURN_RATE = 0.3,  -- cost of turning from the previous step's direction
+	TURN = 0.5,       -- ...turning away from the screen, and to...
+	TURN_RATE = 3,    -- ...turning in one step (squared, so a spin spreads its turn evenly)
 	MAX_CROSS = 120,  -- hips can't twist further than this against the feet
 }
 
@@ -400,27 +400,55 @@ local function WrapDeg(d)
 end
 Solver.WrapDeg = WrapDeg
 
-function Solver.Facing(lx, ly, rx, ry, previous)
-	local B = Solver.Body
-	local dx, dy = rx - lx, ry - ly
+-- How far the legs are crossed (degrees) for feet at (ax,ay) / (bx,by) and
+-- a body facing `deg`. 0 = feet side by side, 180 = completely swapped.
+local function Crossing(ax, ay, bx, by, deg)
+	local dx, dy = bx - ax, by - ay
 	local len = math.sqrt(dx * dx + dy * dy)
+	if len < EPS then return 0 end
+	local a = math.rad(deg)
+	local c = (dx * math.cos(a) + dy * math.sin(a)) / len
+	return math.deg(math.acos(math.max(-1, math.min(1, c))))
+end
+Solver.Crossing = Crossing
+
+-- Body direction after a step. `previous` is the direction before the step,
+-- and plx..pry (optional) where the feet were before it.
+--
+-- The result is "unwrapped": it can go past +-180 so a spin keeps counting
+-- the same way (-90 then -180 then -270 is a full turn to the right). The
+-- body turns from `previous` by at most 180 degrees, either way, and only
+-- along a path that's physically possible: at every point of the step
+-- (feet part-way between old and new spots, body part-way through its turn)
+-- the hips must stay within MAX_CROSS of the feet. That rules out, say,
+-- swinging back through the screen while one leg is still crossed behind
+-- the other; you keep turning the way you were going instead.
+function Solver.Facing(lx, ly, rx, ry, previous, plx, ply, prx, pry)
+	local B = Solver.Body
 	previous = previous or 0
-	local best, bestCost = previous, math.huge
-	for deg = -180, 175, 5 do
-		local a = math.rad(deg)
-		local cross = 0
-		if len > EPS then
-			local c = (dx * math.cos(a) + dy * math.sin(a)) / len
-			cross = math.deg(math.acos(math.max(-1, math.min(1, c))))
-		end
+	local best, bestCost = nil, math.huge
+	local fallback, fallbackCost = previous, math.huge
+	for delta = -180, 180, 5 do
+		local deg = previous + delta
+		local cross = Crossing(lx, ly, rx, ry, deg)
 		if cross <= B.MAX_CROSS then
 			local cost = B.CROSS * (cross / 180) ^ 2
-				+ B.TURN * (math.abs(deg) / 180) ^ 2
-				+ B.TURN_RATE * math.abs(WrapDeg(deg - previous)) / 180
-			if cost < bestCost then best, bestCost = deg, cost end
+				+ B.TURN * (math.abs(WrapDeg(deg)) / 180) ^ 2
+				+ B.TURN_RATE * (delta / 180) ^ 2
+			local possible = true
+			if plx then
+				for _, t in ipairs({ 0.25, 0.5, 0.75 }) do
+					local c = Crossing(plx + (lx - plx) * t, ply + (ly - ply) * t,
+						prx + (rx - prx) * t, pry + (ry - pry) * t, previous + delta * t)
+					if c > B.MAX_CROSS then possible = false break end
+				end
+			end
+			if possible and cost < bestCost then best, bestCost = deg, cost end
+			if cost < fallbackCost then fallback, fallbackCost = deg, cost end
 		end
 	end
-	return best
+	-- (if no path is possible, e.g. a chart that jumps both feet across, take the best end pose)
+	return best or fallback
 end
 
 -- Unit vector the body faces, in pad coordinates.
@@ -535,6 +563,7 @@ function Solver.Solve(rows, layoutName, yield)
 	local out = {}
 	local startFacing = Solver.Facing(startState.l.x, startState.l.y, startState.r.x, startState.r.y, 0)
 	local facing = startFacing
+	local prevL, prevR, prevTime = startState.l, startState.r, nil
 	for i, row in ipairs(rows) do
 		local st = path[i]
 		local feet, tech = {}, {}
@@ -556,7 +585,14 @@ function Solver.Solve(rows, layoutName, yield)
 				kind = note.kind, endTime = note.endTime,
 			}
 		end
-		facing = Solver.Facing(st.l.x, st.l.y, st.r.x, st.r.y, facing)
+		-- The turn has to be physically possible on the way through the step,
+		-- unless there's been a pause long enough to just reset your stance.
+		if prevTime and row.time - prevTime <= 1.0 then
+			facing = Solver.Facing(st.l.x, st.l.y, st.r.x, st.r.y, facing, prevL.x, prevL.y, prevR.x, prevR.y)
+		else
+			facing = Solver.Facing(st.l.x, st.l.y, st.r.x, st.r.y, WrapDeg(facing))
+		end
+		prevL, prevR, prevTime = st.l, st.r, row.time
 		out[i] = {
 			beat = row.beat, time = row.time, notes = notes, tech = tech, cost = st.cost,
 			L = Snapshot(st.l), R = Snapshot(st.r), facing = facing,

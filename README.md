@@ -10,7 +10,7 @@ FootGuide fills that gap:
 
 - **It finds the footing.** For any dance single or double chart, it searches every way of placing your feet and picks the one that flows best. It avoids doublesteps, keeps crossovers to where they're needed, and handles holds, jumps, brackets and footswitches. This is the same idea ITGmania uses internally to count crossovers and footswitches. FootGuide's results were tuned to agree with ITGmania's own counts on hundreds of charts.
 - **It shows you while you play,** without cluttering the screen: a small **L** or **R** rides on each arrow in your own notefield. A "tricky only" mode marks just the hard spots.
-- **It teaches the hard parts.** The trainer finds the trickiest sections of a chart. It animates each move on a big pad and explains footswitches, crossovers and brackets in plain words. Then it lets you drill them step by step, or with the music pausing until you take each step.
+- **It teaches the hard parts.** The trainer finds the trickiest sections of a chart. It animates each move on a big pad and explains footswitches, crossovers and brackets in plain words. Then it lets you drill them with the song playing and pausing whenever you haven't taken the next step yet.
 
 ## What you get
 
@@ -29,9 +29,7 @@ The badges follow your speed mod, Mini, Reverse, notefield offset and Hidden/Sud
 ### The trainer
 
 1. **Pick a section.** The trainer lists the whole chart, then its trickiest 2-measure stretches, labelled with what's in them (for example "Measures 37-38: 3 crossovers, 1 footswitch").
-2. **Pick how to practise** with Left/Right:
-   - **Step by step:** nothing moves until you step. Take your time with each move.
-   - **With music:** the song plays at your chosen Music Rate and the arrows scroll up to a line. If an arrow reaches the line before you've stepped, the music **pauses and waits**. Keep up, and it never stops.
+2. **Practise with the music.** The song plays at your chosen Music Rate and the arrows scroll up to a line. If an arrow reaches the line before you've stepped, the music **pauses and waits** while the pad demonstrates the move. Keep up, and it never stops. To go slower, lower the Music Rate on Player Options.
 3. **Watch, then step.** A large pad demonstrates each move:
    - **The moving foot** slides along a dotted path to where it lands.
    - **Footswitches:** the foot already on the panel visibly lifts off as the other one lands.
@@ -47,8 +45,8 @@ The badges follow your speed mod, Mini, Reverse, notefield offset and Hidden/Sud
 4. **Repeat until clean.** The trainer counts your clean runs in a row. **Back** returns to the section list, and from there to Player Options for the same song, where you can start the trainer again or switch Foot Guide to another mode and play the song.
 
 A good learning routine:
-1. Learn a section **step by step**.
-2. Get it clean **with music**.
+1. Learn a section in the trainer at a **low Music Rate**, letting it pause as often as you need.
+2. Raise the rate until you get it clean without pauses.
 3. Play the song with **Tricky Only**, at a lower Music Rate if needed.
 
 ## Requirements

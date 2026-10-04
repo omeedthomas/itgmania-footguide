@@ -105,6 +105,46 @@ CheckBody("body: R-D-L crossover in front", "D", "L", 0, 45, 100, "R")
 CheckBody("body: U+D half turn", "U", "D", 0, -90, -30, nil)
 CheckBody("body: spin keeps turning right", "R", "L", -80, -150, -95, nil)
 CheckBody("body: spin keeps turning left", "R", "L", 80, 95, 150, nil)
+-- Turning has to be continuous and physically possible through each step.
+local function BodyPath(pattern)
+	local r = Solver.Solve(Rows(pattern, S8), "dance-single")
+	local prev, path = r.startFacing, {}
+	for _, row in ipairs(r.rows) do
+		path[#path+1] = { foot = Feet({ rows = { row } }), turn = row.facing - prev, facing = row.facing, row = row }
+		prev = row.facing
+	end
+	return path
+end
+do
+	-- Break Down! (the case from a user's video): left on Up, right crosses
+	-- behind to Left, then the left foot goes Up -> Down. The body must keep
+	-- turning the way it was going, not swing back through the screen.
+	local path = BodyPath("L U L D U L D U L")
+	local ok, desc = false, "pattern not found"
+	for k = 2, #path do
+		local a, b = path[k - 1].row, path[k].row
+		if a.L.y == 2 and a.R.x == 0 and b.L.y == 0 and b.movedL then
+			ok = (path[k - 1].turn < 0 and path[k].turn < 0) or (path[k - 1].turn > 0 and path[k].turn > 0)
+			desc = ("crossed-behind turn %+d, then left Up->Down turn %+d"):format(path[k - 1].turn, path[k].turn)
+		end
+	end
+	if ok then pass = pass + 1 else fail = fail + 1 end
+	print(string.format("%s %-30s %s", ok and "PASS" or "FAIL", "body: keeps turning (video)", desc))
+
+	-- A spin round the pad: turns one way, about 90 degrees a step, all the way round.
+	local spin = BodyPath("L D R U L D R U L")
+	local maxStep, total, oneWay = 0, 0, true
+	for k = 2, #spin do
+		maxStep = math.max(maxStep, math.abs(spin[k].turn))
+		total = total + spin[k].turn
+		if spin[k].turn > 5 then oneWay = false end
+	end
+	ok = oneWay and maxStep <= 135 and total <= -540
+	if ok then pass = pass + 1 else fail = fail + 1 end
+	print(string.format("%s %-30s total %d degrees, biggest step %d", ok and "PASS" or "FAIL",
+		"body: spin turns evenly", total, maxStep))
+end
+
 -- Never twisted further than the hips allow.
 local worst = 0
 for _, l in pairs(P) do

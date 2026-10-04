@@ -126,7 +126,7 @@ FootGuide=Foot Guide
 Under the `[OptionExplanations]` section, add (for example right after the `Stepchart=` line):
 
 ```ini
-FootGuide=On Notes: L/R on every arrow. Tricky Only: just around crossovers, footswitches and brackets. Side Panel: pad diagram beside the notes. Trainer: practice step by step instead of playing.
+FootGuide=On Notes: L/R on every arrow. Tricky Only: just around crossovers, footswitches and brackets. Side Panel: pad diagram beside the notes. Trainer: practise the hard parts with the music pausing until you step, instead of playing.
 ```
 
 If you play ITGmania in another language and the row shows up without its name or help text, add the same two lines to that language's file too (for example `Languages/de.ini`), translated if you like.

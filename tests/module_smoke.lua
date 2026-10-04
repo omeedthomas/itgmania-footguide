@@ -19,8 +19,15 @@ function Actor:GetChild(name)
 	return c
 end
 function Actor:SetUpdateFunction(f) self.update = f return self end
-function Actor:visible(v) self.isVisible = v return self end
-function Actor:settext(t) self.text = t return self end
+-- Strict like the real engine: visible() needs a boolean, settext() a string.
+function Actor:visible(v)
+	if type(v) ~= "boolean" then error("visible() called with " .. type(v) .. " on " .. tostring(self.name), 2) end
+	self.isVisible = v return self
+end
+function Actor:settext(t)
+	if type(t) ~= "string" and type(t) ~= "number" then error("settext() called with " .. type(t) .. " on " .. tostring(self.name), 2) end
+	self.text = tostring(t) return self
+end
 -- positions are stored as px/py so they don't hide the x()/y() methods
 function Actor:xy(x, y) self.px, self.py = x, y return self end
 function Actor:x(x) self.px = x return self end
@@ -377,22 +384,62 @@ check(#menuItems >= 1 and menuItems[1]:find("Whole chart"), "whole chart item")
 
 check(Press("Back") == true and topScreen.leftTo == "ScreenPlayerOptions", "Back in the menu should go to Player Options")
 topScreen.leftTo = nil   -- (the fake screen stays, so the rest of the test can continue)
-Press("Down"); Press("Up")
-check(Press("Start") == true, "Start should begin a section")
+local menu = tp:GetChild("Menu")
 local drill = tp:GetChild("Drill")
-check(Visible(drill), "drill not shown")
-print("Trainer first instruction: " .. drill:GetChild("Instruction").text)
-
+local padAF = drill:GetChild("Pad")
+local lane = drill:GetChild("Lane")
 local BUTTONS = { "Left", "Down", "Up", "Right" }
--- The pad glows the panels the current step needs (in either mode).
+-- The pad glows the panels the current step needs.
 local function CurrentColumns()
 	local cols = {}
 	for c = 1, n do
-		local glow = drill:GetChild("Pad"):GetChild("Panel" .. c):GetChild("Glow")
+		local glow = padAF:GetChild("Panel" .. c):GetChild("Glow")
 		if (rawget(glow, "alpha") or 0) >= 0.5 then cols[#cols+1] = c end
 	end
 	return cols
 end
+local function TFrames(seconds)
+	for _ = 1, math.max(1, math.floor(seconds * 60 + 0.5)) do realNow = realNow + 1 / 60; RunUpdates(troot) end
+end
+local function Waiting() return lane:GetChild("Heading").text == "WAITING FOR YOUR STEP" end
+local function Finished() return Visible(drill:GetChild("Result")) end
+-- Advance until the next arrow reaches the line and the music waits.
+local function WaitForLine()
+	for _ = 1, 60 * 30 do
+		if Waiting() or Finished() then return end
+		TFrames(1 / 60)
+	end
+	error("FAIL: the music never stopped at the line")
+end
+local function DoStep()
+	for _, c in ipairs(CurrentColumns()) do
+		Press(BUTTONS[(c - 1) % 4 + 1], c > 4 and "GameController_2" or "GameController_1")
+	end
+end
+local function FeetPos()
+	local l, r = padAF:GetChild("FootL"), padAF:GetChild("FootR")
+	return (l.px or 0) .. "," .. (l.py or 0) .. "|" .. (r.px or 0) .. "," .. (r.py or 0)
+end
+
+-- ---------------------------------------------------------------- a section, with the music
+check(not rawget(menu.childrenByName, "Mode"), "there should be no step-by-step / music choice any more")
+Press("Down"); Press("Up")   -- move the cursor and back (the first tricky section)
+local startsBefore, stopsBefore = #music.starts, music.stops
+check(Press("Start") == true, "Start should begin a section")
+check(Visible(drill), "drill not shown")
+check(#music.starts == startsBefore + 1, "the music should start with the section")
+local first = music.starts[#music.starts]
+check(first.path == "/Songs/Test/test.ogg", "wrong music file")
+check(Visible(lane) and not Visible(drill:GetChild("List")), "the scrolling lane should be shown")
+-- Don't step: the music must stop when the first arrow reaches the line.
+WaitForLine()
+check(music.stops > stopsBefore, "music should pause while waiting")
+local laneNotes = 0
+for k = 1, 32 do if Visible(lane:GetChild("Note" .. k)) then laneNotes = laneNotes + 1 end end
+check(laneNotes > 0, "lane should show the waiting arrows")
+print(("Trainer: music started at %.2fs, paused at the first step (%d arrows in the lane)"):format(first.start, laneNotes))
+print("Trainer first instruction: " .. drill:GetChild("Instruction").text)
+-- A wrong panel while waiting counts as a mistake.
 local wrong
 for c = 1, math.min(n, 4) do
 	local needed = false
@@ -401,46 +448,38 @@ for c = 1, math.min(n, 4) do
 end
 Press(BUTTONS[wrong])
 check(drill:GetChild("Progress").text:find("Mistakes: 1"), "wrong panel should count a mistake")
-local stepsDone = 0
+DoStep()
+check(#music.starts == startsBefore + 2, "music should resume after the step")
+print(("Trainer: resumed at %.2fs after the step"):format(music.starts[#music.starts].start))
+-- Keep up with the music: step just before each arrow arrives -> no more pauses.
+local pausesBefore = music.stops
 for _ = 1, 3000 do
-	if Visible(drill:GetChild("Result")) then break end
-	for _, c in ipairs(CurrentColumns()) do
-		Press(BUTTONS[(c - 1) % 4 + 1], c > 4 and "GameController_2" or "GameController_1")
+	if Finished() then break end
+	TFrames(1 / 60)
+	if Waiting() then DoStep()
+	else
+		local note1 = lane:GetChild("Note1")
+		if Visible(note1) and note1.py and note1.py <= 188 + 0.1 * 150 then DoStep() end
 	end
-	stepsDone = stepsDone + 1
 end
-check(Visible(drill:GetChild("Result")), "section never finished")
-print(("Trainer: finished section in %d steps -> %q | %s"):format(stepsDone, drill:GetChild("Result").text,
-	drill:GetChild("Progress").text))
+check(Finished(), "section never finished")
+print(("Trainer: finished (%s | %s); pauses while keeping up: %d"):format(drill:GetChild("Result").text,
+	drill:GetChild("Progress").text, music.stops - pausesBefore))
+TFrames(1.5)
+check(music.stops > pausesBefore, "music should stop after the section ends")
 check(Press("Start") == true, "Start should repeat the section")
 check(drill:GetChild("Progress").text:find("Mistakes: 0"), "repeat should reset mistakes")
 check(Press("Back") == true, "Back in a drill should return to the menu, not leave")
-check(Visible(tp:GetChild("Menu")), "Back should show the menu")
+check(Visible(menu), "Back should show the menu")
 print("Trainer: restart/back ok; sounds played: " .. #played)
 
-local function TFrames(seconds)
-	for _ = 1, math.max(1, math.floor(seconds * 60 + 0.5)) do realNow = realNow + 1 / 60; RunUpdates(troot) end
-end
-local padAF = drill:GetChild("Pad")
-local function FeetPos()
-	local l, r = padAF:GetChild("FootL"), padAF:GetChild("FootR")
-	return (l.px or 0) .. "," .. (l.py or 0) .. "|" .. (r.px or 0) .. "," .. (r.py or 0)
-end
-local function DoStep()
-	for _, c in ipairs(CurrentColumns()) do
-		Press(BUTTONS[(c - 1) % 4 + 1], c > 4 and "GameController_2" or "GameController_1")
-	end
-end
-
--- ---------------------------------------------------------------- step by step: whole chart
+-- ---------------------------------------------------------------- whole chart: demos, body, explanations
 Press("Up"); Press("Up")   -- menu cursor to "Whole chart"
-local menu = tp:GetChild("Menu")
-check(menu:GetChild("Mode").text:find("STEP BY STEP"), "default mode should be step by step")
 Press("Start")
 local helps, animated, steps = {}, 0, 0
 local crossFront, crossBehind, bodyTurns, legChecks = nil, nil, 0, 0
 local body = padAF:GetChild("Body")
--- Each leg must run from a hip (near the middle of the body) to exactly one foot.
+-- Each leg must run from a hip (near the middle of the body) to a foot.
 local function LegEnds(leg)
 	local len = leg.calls.zoomto[2]
 	local a = math.rad(leg.calls.rotationz[1] + 90)
@@ -464,7 +503,8 @@ local function LegsAttached()
 end
 local lastTorso
 for _ = 1, 5000 do
-	if Visible(drill:GetChild("Result")) then break end
+	WaitForLine()
+	if Finished() then break end
 	local help = drill:GetChild("Help").text or ""
 	for line in help:gmatch("[^\n]+") do
 		local key = line:match("^%(?(%a+)") or line
@@ -472,7 +512,7 @@ for _ = 1, 5000 do
 		if line:find("^Crossover") and line:find("in front of") then crossFront = crossFront or line end
 		if line:find("^Crossover") and line:find("behind") then crossBehind = crossBehind or line end
 	end
-	-- the demo loop must actually move the feet, and the body must follow them
+	-- while the music waits, the demo loop must move the feet, and the body must follow them
 	TFrames(0.1); local a = FeetPos()
 	check(Visible(body), "body hidden in the trainer")
 	if LegsAttached() then legChecks = legChecks + 1 end
@@ -485,11 +525,11 @@ for _ = 1, 5000 do
 	DoStep()
 	steps = steps + 1
 end
-check(Visible(drill:GetChild("Result")), "whole chart never finished")
+check(Finished(), "whole chart never finished")
 check(animated > steps * 0.5, ("demo animation only moved on %d of %d steps"):format(animated, steps))
 check(legChecks == 2 * steps, ("legs not attached to the feet on %d of %d frames checked"):format(2 * steps - legChecks, 2 * steps))
 check(bodyTurns > 0, "the body never turned")
-print(("Step by step, whole chart: %d steps, demo moved the feet on %d, body turned on %d; legs always attached to the feet"):format(
+print(("Whole chart: %d steps, demo moved the feet on %d, body turned on %d; legs always attached to the feet"):format(
 	steps, animated, bodyTurns))
 print("  Explanations seen:")
 for _, key in ipairs({ "Footswitch", "Crossover", "Bracket", "Jump", "Spin", "Body", "Still", "Doublestep", "Jack", "Hold", "Keep" }) do
@@ -498,46 +538,5 @@ end
 if crossFront then print("    " .. crossFront) end
 if crossBehind then print("    " .. crossBehind) end
 check(helps["Crossover"], "no crossover explanation on a chart with crossovers")
-
--- ---------------------------------------------------------------- with music
-Press("Back")
-Press("Right")
-check(menu:GetChild("Mode").text:find("WITH MUSIC"), "Left/Right should switch to music mode")
-Press("Down")   -- the first tricky section
-local startsBefore, stopsBefore = #music.starts, music.stops
-Press("Start")
-check(#music.starts == startsBefore + 1, "music should start with the section")
-local first = music.starts[#music.starts]
-check(first.path == "/Songs/Test/test.ogg", "wrong music file")
-check(Visible(drill:GetChild("Lane")) and not Visible(drill:GetChild("List")), "music mode should show the lane")
--- Don't step: the music must stop when the first arrow reaches the line.
-TFrames(3)
-local heading = drill:GetChild("Lane"):GetChild("Heading").text
-check(heading == "WAITING FOR YOUR STEP", "should be waiting at the line, got " .. tostring(heading))
-check(music.stops > stopsBefore, "music should pause while waiting")
-local laneNotes = 0
-for k = 1, 32 do if Visible(drill:GetChild("Lane"):GetChild("Note" .. k)) then laneNotes = laneNotes + 1 end end
-check(laneNotes > 0, "lane should show the waiting arrows")
-print(("With music: started at %.2fs, paused at the first step (%d arrows in the lane)"):format(first.start, laneNotes))
-DoStep()
-check(#music.starts == startsBefore + 2, "music should resume after the step")
-print(("With music: resumed at %.2fs after the step"):format(music.starts[#music.starts].start))
--- Keep up with the music: step just before each arrow arrives -> no more pauses.
-local pausesBefore = music.stops
-for _ = 1, 3000 do
-	if Visible(drill:GetChild("Result")) then break end
-	TFrames(1 / 60)
-	if drill:GetChild("Lane"):GetChild("Heading").text == "WAITING FOR YOUR STEP" then DoStep()
-	else
-		-- step when the current arrow is within 0.1s of the line
-		local Ln = drill:GetChild("Lane")
-		local note1 = Ln:GetChild("Note1")
-		if Visible(note1) and note1.py and note1.py <= 188 + 0.1 * 150 then DoStep() end
-	end
-end
-check(Visible(drill:GetChild("Result")), "music section never finished")
-print(("With music: finished (%s); pauses while keeping up: %d"):format(drill:GetChild("Result").text, music.stops - pausesBefore))
-TFrames(1.5)
-check(music.stops > pausesBefore, "music should stop after the section ends")
 
 print("SMOKE OK")

@@ -35,7 +35,7 @@ $ThemeEdits = @(
         "# --- end FootGuide trainer ---") -join $nl) },
     # Row title and the help text shown at the bottom of Player Options.
     @{ File = "Languages\en.ini"; Find = "${nl}Stepchart=Stepchart"; Add = "${nl}FootGuide=Foot Guide" },
-    @{ File = "Languages\en.ini"; Find = "${nl}Stepchart=Choose the stepchart you wish to play."; Add = "${nl}FootGuide=On Notes: L/R on every arrow. Tricky Only: just around crossovers, footswitches and brackets. Side Panel: pad diagram beside the notes. Trainer: practice step by step instead of playing." }
+    @{ File = "Languages\en.ini"; Find = "${nl}Stepchart=Choose the stepchart you wish to play."; Add = "${nl}FootGuide=On Notes: L/R on every arrow. Tricky Only: just around crossovers, footswitches and brackets. Side Panel: pad diagram beside the notes. Trainer: practise the hard parts with the music pausing until you step, instead of playing." }
 )
 
 # Patterns that find every FootGuide edit, current or older.
